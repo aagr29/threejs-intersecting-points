@@ -1,6 +1,6 @@
 to start:
-git clone https://github.com/cognitive-earth/Threejs-click-create.git
-cd Threejs-click-create
+git clone https://github.com/aagr29/threejs-intersecting-points.git
+cd threejs-intersecting-points
 npm start
 Visit http://127.0.0.1:3000
 

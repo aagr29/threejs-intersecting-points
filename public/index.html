@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title>three.js webgl - interactive - raycasting - points</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+	<link type="text/css" rel="stylesheet" href="main.css" />
+</head>
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script>
+	// get poles coordinates
+	var xp = [];
+	var yp = [];
+	var zp = [];
+	$.get("/get_coordinates", function (result) {
+		var data_x = result["x"];
+		var data_y = result["y"];
+		var data_z = result["z"];
+		for (let i = 0; i < data_x.length; i++) {
+			xp[i] = data_x[i];
+			yp[i] = data_y[i];
+			zp[i] = data_z[i];
+		}
+	});
+</script>
+
+<body>
+	<div id="container"></div>
+	<div id="info">
+		<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>
+		drawing the curve by multiselecting of points
+	</div>
+
+	<!-- Import maps polyfill -->
+	<!-- Remove this when import maps will be widely supported -->
+	<!-- <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script> -->
+	<script src="three143.js"></script>
+	<script src="OrbitControls.js"></script>
+	<script type="importmap">
+      {
+        "imports": {
+          "three": "../build/three.module.js",
+          "three/addons/": "./jsm/"
+        }
+      }
+    </script>
+
+	<script type="module">
+		let renderer, scene, camera;
+		let raycaster;
+		let intersection = null;
+		let spheresIndex = 0;
+		let clock;
+		let toggle = 0;
+		let orbitcontrol;
+		let sphere, sphereGeometry, sphereMaterial;
+		let pcIndexed, pcIndexedOffset;
+		let vector = [];
+		let countNumber = 0;
+		let pointNumber = 3;
+		let splineObject;
+		let previndex;
+		let splineCurve;
+		let index_1, index_2, index_3;
+		let modifypoint;
+		let modifysphereMaterial;
+		let midify_flag = false;
+		let refer_index;
+		let spheres = [];
+		let index_array = [];
+		let vector_array = [];
+		let splineObject_array = [];
+
+		const pointer = new THREE.Vector2();
+
+		const threshold = 6;
+		const pointSize = 1;
+		const width = 1;
+		const length = 1;
+		// const rotateY = new THREE.Matrix4().makeRotationY( 0.005 );
+		let pointclouds = []; // The object that represents the visible cloud of points. // Object of type THREE.Geometry containing the visible points.
+
+		init();
+		animate();
+		console.log(xp);
+
+
+		function generatePointCloudGeometry() {
+			const points = [];
+			for (let i = 0; i < xp.length; i++) {
+				const x = parseFloat(xp[i]).toFixed(7);
+				const y = parseFloat(yp[i]).toFixed(7);
+				const z = parseFloat(zp[i]).toFixed(7);
+				points.push(x, y, z);
+			}
+
+			const geometry = new THREE.BufferGeometry();
+
+			geometry.setAttribute(
+				"position",new THREE.BufferAttribute(new Float32Array(points),3)
+			);
+		
+
+			return geometry;
+		}
+		function generatePointcloud() {
+			const geometry = generatePointCloudGeometry();
+			const material = new THREE.PointsMaterial({
+				color: 0xffffff,
+				size: pointSize,
+			});
+			return new THREE.Points(geometry, material);
+		}
+
+
+		function init() {
+			const container = document.getElementById("container");
+
+			scene = new THREE.Scene();
+
+			clock = new THREE.Clock();
+
+			camera = new THREE.PerspectiveCamera(
+				45,
+				window.innerWidth / window.innerHeight,
+				1,
+				10000
+			);
+			camera.position.set(10, 10, 10);
+			camera.lookAt(scene.position);
+			camera.updateMatrix();
+			const pcBuffer = generatePointcloud();
+			pcBuffer.scale.set(5, 10, 10);
+			pcBuffer.position.set(-5, 0, 0);
+			scene.add(pcBuffer);
+
+			pointclouds = [pcBuffer];
+
+			console.log(pointclouds);
+
+			renderer = new THREE.WebGLRenderer({ antialias: true });
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			container.appendChild(renderer.domElement);
+
+			//
+
+			raycaster = new THREE.Raycaster();
+			raycaster.params.Points.threshold = threshold;
+
+			//
+
+			orbitcontrol = new THREE.OrbitControls(camera, renderer.domElement);
+			orbitcontrol.update();
+			orbitcontrol.addEventListener("change", render);
+			//
+
+			const sphereGeometry = new THREE.SphereGeometry(2, 32, 32);
+			const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+
+			// for ( let i = 0; i < 40; i ++ ) {
+
+			// 	const sphere = new THREE.Mesh( sphereGeometry, sphereMaterial );
+			// 	scene.add( sphere );
+			// 	spheres.push( sphere );
+
+			// }
+			sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+			scene.add(sphere);
+			document.addEventListener("click", selectPoint);
+		}
+
+		function onPointerMove(event) {
+			pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+			pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+		}
+		function selectPoint(event) {
+			console.log("im clicked");
+			raycaster.setFromCamera(pointer, camera);
+			console.log(pointclouds)
+			const intersections = raycaster.intersectObjects(pointclouds, false);
+			console.log(intersections)
+			intersection = (intersections.length) > 0 ? intersections[0] : null;
+			sphere.position.set(intersection.point.x, intersection.point.y, intersection.point.z);
+			console.log(intersection);
+		}
+		function onWindowResize() {
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize(window.innerWidth, window.innerHeight);
+		}
+
+		function animate() {
+			requestAnimationFrame(animate);
+
+			render();
+		}
+
+		function render() {
+			camera.updateMatrixWorld();
+			renderer.render(scene, camera);
+		}
+	</script>
+</body>
+
+</html>
